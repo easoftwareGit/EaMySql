@@ -1908,9 +1908,9 @@ Public Class MySqlTools
 
 #Region " Create Table "
 
-    Private Shared Function CreateTable(MySqlConn As MySqlConnection,
-                                        TableName As String,
-                                        SqlText As String) As Integer
+    Public Shared Function CreateTable(MySqlConn As MySqlConnection,
+                                       TableName As String,
+                                       SqlText As String) As Integer
 
         ' create a new data table
         '
@@ -3537,6 +3537,7 @@ Public Class MySqlTools
 
     Public Shared Function ChangePassword(MySqlConn As MySqlConnection,
                                           UserName As String,
+                                          HostName As String,
                                           newPassword As String,
                                           Optional auth_plugin As String = NativePassword) As Integer
 
@@ -3545,6 +3546,7 @@ Public Class MySqlTools
         ' vars passed:
         '   MySqlConn - mySql connection to use.  NOTE: no database param in connection string
         '   UserName - name of user 
+        '   HostName - name of host 
         '   newPassword - user's new password
         '   auth_plugin - mysql authentication plugin
         '
@@ -3570,7 +3572,7 @@ Public Class MySqlTools
                 Return sqlNoUser                                                                        ' return error
             End If
 
-            Dim SqlText As String = String.Format(CreateUserFormat, UserName.ToLower, MySqlConn.DataSource.ToLower) ' create initial sql command text
+            Dim SqlText As String = String.Format(CreateUserFormat, UserName.ToLower, HostName)         ' create initial sql command text
             If auth_plugin = String.Empty Then                                                          ' if no authentication plug in 
                 SqlText &= String.Format(PasswordNoAuthFormat, newPassword)                             ' add just password 
             Else                                                                                        ' else got authentication plug in
@@ -3589,6 +3591,7 @@ Public Class MySqlTools
 
     Public Shared Function CreateUser(MySqlConn As MySqlConnection,
                                       UserName As String,
+                                      HostName As String,
                                       Optional password As String = "",
                                       Optional auth_plugin As String = NativePassword) As Integer
 
@@ -3597,6 +3600,7 @@ Public Class MySqlTools
         ' vars passed:
         '   MySqlConn - mySql connection to use.  NOTE: no database param in connection string
         '   UserName - name of user to create
+        '   HostName - name of host 
         '   password - user's password
         '   auth_plugin - mysql authentication plugin
         '
@@ -3623,7 +3627,7 @@ Public Class MySqlTools
             If Not DatabaseParamBlank(MySqlConn) Then                                                   ' if got a database param
                 Return sqlInvalidConnStr                                                                ' return error
             End If
-            Dim SqlText As String = String.Format(CreateUserFormat, UserName.ToLower, MySqlConn.DataSource.ToLower) ' create initial sql command text
+            Dim SqlText As String = String.Format(CreateUserFormat, UserName.ToLower, HostName)         ' create initial sql command text
             If password <> String.Empty Then                                                            ' if got password
                 If auth_plugin = String.Empty Then                                                      ' if no authentication plug in 
                     SqlText &= String.Format(PasswordNoAuthFormat, password)                            ' add in just password 
@@ -3643,13 +3647,15 @@ Public Class MySqlTools
 #Region " Drop User "
 
     Public Shared Function DropUser(MySqlConn As MySqlConnection,
-                                    UserName As String) As Integer
+                                    UserName As String,
+                                    HostName As String) As Integer
 
         ' drops a user from a connection
         '
         ' vars passed:
         '   MySqlConn - mySql connection to use.  NOTE: no database param in connection string 
         '   UserName - name of user to drop
+        '   HostName - name of host 
         '
         ' returns:
         '   >= 0 - user created
@@ -3663,11 +3669,11 @@ Public Class MySqlTools
 
         _errorMessage = String.Empty
         Try
-            If Not DatabaseParamBlank(MySqlConn) Then                                                               ' if got a database param
-                Return sqlInvalidConnStr                                                                            ' return error
+            If Not DatabaseParamBlank(MySqlConn) Then                                                   ' if got a database param
+                Return sqlInvalidConnStr                                                                ' return error
             End If
-            Dim SqlText As String = String.Format(DropUserFormat, UserName.ToLower, MySqlConn.DataSource.ToLower)   ' create sql command text
-            Return ExecuteNonQuery(MySqlConn, SqlText)                                                              ' drop user
+            Dim SqlText As String = String.Format(DropUserFormat, UserName.ToLower, HostName)           ' create sql command text
+            Return ExecuteNonQuery(MySqlConn, SqlText)                                                  ' drop user
         Catch ex As Exception
             _errorMessage = String.Format(efOther, ex.Message)
             Return sqlOtherErr
@@ -3680,7 +3686,8 @@ Public Class MySqlTools
 
     Public Shared Function UserGrantAllAccess(MySqlConn As MySqlConnection,
                                               Database As String,
-                                              UserName As String) As Integer
+                                              UserName As String,
+                                              HostName As String) As Integer
 
         ' grants user privileges to a database
         ' 
@@ -3688,6 +3695,7 @@ Public Class MySqlTools
         '   MySqlConn - mySql connection to use.  
         '   Database - name of database to grant access to
         '   UserName - name of user to drop
+        '   HostName - name of host 
         '
         ' returns:
         '   sqlNoConnection - no connection
@@ -3708,7 +3716,7 @@ Public Class MySqlTools
                 Return sqlNoUser                                                ' return error
             End If
 
-            Dim SqlText As String = String.Format(GrantUserFormat, Database.ToLower, UserName.ToLower, MySqlConn.DataSource.ToLower) ' create sql command text
+            Dim SqlText As String = String.Format(GrantUserFormat, Database.ToLower, UserName.ToLower, HostName) ' create sql command text
             Return ExecuteNonQuery(MySqlConn, SqlText)                          ' grant user access
         Catch ex As Exception
             _errorMessage = String.Format(efOther, ex.Message)
