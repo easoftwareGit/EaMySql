@@ -3682,6 +3682,40 @@ Public Class MySqlTools
 
 #End Region
 
+#Region " Get User Host Name "
+
+    Public Shared Function GetUserHostName(MySqlConn As MySqlConnection,
+                                           UserName As String) As String
+
+        ' gets the host name for a user
+        '
+        ' vars passed:
+        '   MySqlConn - connection to use
+        '   UserName - user name to get host name for
+        '
+        ' returns:
+        '   MySqlVersion - version info Major.Minor.Build
+        '   Nothing - 
+        '     - version info not found
+        '     - something went wrong
+
+        _errorMessage = String.Empty
+        Try
+            Dim objToFind As New MySqlInfo(MySqlInfo.MySqlTypesToFindTypes.User, UserName)      ' get object to find info
+            If DoesItExist(MySqlConn, objToFind) = ExistsTypes.Yes Then                         ' if got version string
+                Return CStr(objToFind.ReaderData)                                               ' return view text 
+            Else                                                                                ' else did not get version info
+                _errorMessage = "View not found"
+                Return String.Empty
+            End If
+        Catch ex As Exception
+            _errorMessage = String.Format(efOther, ex.Message)
+            Return String.Empty
+        End Try
+    End Function
+
+#End Region
+
 #Region " Grant Access "
 
     Public Shared Function UserGrantAllAccess(MySqlConn As MySqlConnection,
@@ -4219,17 +4253,17 @@ Public Class MySqlTools
         '   ViewName - view name to get command text for
         '
         ' returns:
-        '   MySqlVersion - version info Major.Minor.Build
-        '   Nothing - 
+        '   <> String.Empty - test for view command
+        '   String.Empty - 
         '     - version info not found
         '     - something went wrong
 
         _errorMessage = String.Empty
         Try
             Dim objToFind As New MySqlInfo(MySqlInfo.MySqlTypesToFindTypes.ViewSqlText, ViewName, String.Empty, MySqlConn.Database) ' get view text object to find
-            If DoesItExist(MySqlConn, objToFind) = ExistsTypes.Yes Then                                                         ' if got version string
-                Return CStr(objToFind.ReaderData)                                                                               ' return view text 
-            Else                                                                                                                ' else did not get version info
+            If DoesItExist(MySqlConn, objToFind) = ExistsTypes.Yes Then             ' if got view/proc 
+                Return CStr(objToFind.ReaderData)                                   ' return view/proc text 
+            Else                                                                    ' else did not get view/proc
                 _errorMessage = "View not found"
                 Return String.Empty
             End If

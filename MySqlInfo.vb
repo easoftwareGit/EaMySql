@@ -35,11 +35,11 @@
 
 #Region " Private Vars "
 
-    Private _text As String
     Private _names As List(Of String)
     Private _nameToFind As String
     Private _params As List(Of MySqlParam)
     Private _tableInfo As DataTable
+    Private _text As String
 
 #End Region
 
@@ -107,7 +107,8 @@
                     Return _tableInfo
                 Case MySqlTypesToFindTypes.Indexes
                     Return _names
-                Case MySqlTypesToFindTypes.ProcedureSqlText,
+                Case MySqlTypesToFindTypes.User,
+                     MySqlTypesToFindTypes.ProcedureSqlText,
                      MySqlTypesToFindTypes.ViewSqlText,
                      MySqlTypesToFindTypes.Version
                     Return _text
@@ -136,7 +137,8 @@
                 Case MySqlTypesToFindTypes.User
 
                     ' SELECT COUNT(*) FROM mysql.user WHERE user='<username>'
-                    Const UserExistsFormat As String = "SELECT COUNT(*) FROM mysql.user WHERE user='{0}'"
+                    'Const UserExistsFormat As String = "SELECT COUNT(*) FROM mysql.user WHERE user='{0}'"
+                    Const UserExistsFormat As String = "SELECT * FROM mysql.user WHERE user='{0}'"
                     Return String.Format(UserExistsFormat, NameToFind.ToLower)
 
                 Case MySqlTypesToFindTypes.Table
@@ -293,12 +295,12 @@
         Try
             If ReaderObj Is Nothing Then                                    ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                         ' cannot confirm database exists
+                Return MySqlTools.ExistsTypes.GotError                      ' cannot confirm database exists
             Else                                                            ' else got a return value             
                 If ReaderObj.HasRows Then                                   ' if got rows in return object
-                    Return MySqlTools.ExistsTypes.Yes                          ' database exists
+                    Return MySqlTools.ExistsTypes.Yes                       ' database exists
                 Else                                                        ' else no rows
-                    Return MySqlTools.ExistsTypes.No                           ' database does not exist
+                    Return MySqlTools.ExistsTypes.No                        ' database does not exist
                 End If
             End If
         Catch ex As Exception
@@ -329,7 +331,7 @@
             Dim curName As String                                           ' current found index name
             If ReaderObj Is Nothing Then                                    ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                         ' cannot confirm user exists
+                Return MySqlTools.ExistsTypes.GotError                      ' cannot confirm user exists
             Else                                                            ' else got a return value  
                 If ReaderObj.HasRows Then                                   ' if got rows in return object
                     While ReaderObj.Read()                                  ' get the next piece of data
@@ -340,9 +342,9 @@
                     End While
                 End If
                 If _names.Count > 0 Then                                    ' if got indexes
-                    Return MySqlTools.ExistsTypes.Yes                          ' indexes do exist
+                    Return MySqlTools.ExistsTypes.Yes                       ' indexes do exist
                 Else                                                        ' else no rows
-                    Return MySqlTools.ExistsTypes.No                           ' indexes do not exist
+                    Return MySqlTools.ExistsTypes.No                        ' indexes do not exist
                 End If
             End If
         Catch ex As Exception
@@ -411,14 +413,14 @@
         Try
             If ReaderObj Is Nothing Then                                    ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                         ' cannot confirm user exists
+                Return MySqlTools.ExistsTypes.GotError                      ' cannot confirm user exists
             Else                                                            ' else got a return value                             
                 If ReaderObj.HasRows Then                                   ' if got rows in return object
                     ReaderObj.Read()                                        ' only need to read one row
                     _nameToFind = CType(ReaderObj(pkNameColIndex), String)  ' get primary key name
-                    Return MySqlTools.ExistsTypes.Yes                          ' primary key exists
+                    Return MySqlTools.ExistsTypes.Yes                       ' primary key exists
                 Else                                                        ' else count will be 0
-                    Return MySqlTools.ExistsTypes.No                           ' primary key does not exist
+                    Return MySqlTools.ExistsTypes.No                        ' primary key does not exist
                 End If
             End If
         Catch ex As Exception
@@ -444,11 +446,11 @@
         '   ExistsTypes.GotError - something went wrong
 
         Try
-            If ReaderObj Is Nothing Then                                                ' if something went wrong
+            If ReaderObj Is Nothing Then                                                    ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                                     ' cannot confirm view exists
-            Else                                                                        ' else got a reader object
-                If ReaderObj.HasRows Then                                               ' if got rows in return object
+                Return MySqlTools.ExistsTypes.GotError                                      ' cannot confirm view exists
+            Else                                                                            ' else got a reader object
+                If ReaderObj.HasRows Then                                                   ' if got rows in return object
                     _params = New List(Of MySqlParam)
                     Dim dataType As MySqlDataType
                     Dim dataTypeStr As String
@@ -459,31 +461,31 @@
                     Dim numPrecision As Integer
                     Dim numScale As Integer
                     Dim ordPos As Integer
-                    While ReaderObj.Read()                                              ' get the next piece of data
+                    While ReaderObj.Read()                                                  ' get the next piece of data
                         ordPos = ReaderObj.GetInt32(MySqlTools.cnOrdinalPos)
                         mode = ReaderObj.GetString(MySqlTools.cnParamMode)
                         name = ReaderObj.GetString(MySqlTools.cnParamName)
                         dataTypeStr = ReaderObj.GetString(MySqlTools.cnDataType)
                         dataType = GetDataType(dataTypeStr)
-                        If dataType Is MySqlDataType.dtDecimal Then                     ' if a decimal value
-                            numPrecision = ReaderObj.GetInt32(MySqlTools.cnNumPrecision)   ' get precision
-                            numScale = ReaderObj.GetInt32(MySqlTools.cnNumScale)           ' get scale
-                            mySqlCol = New MySqlColumn(name, numPrecision, numScale)    ' create decimal column
-                        ElseIf dataType Is MySqlDataType.dtVarChar Then                 ' else if a var char value
-                            maxLen = ReaderObj.GetInt32(MySqlTools.cnCharMaxLen)           ' get max length
-                            mySqlCol = New MySqlColumn(name, dataType, maxLen)          ' create var char column
-                        Else                                                            ' else other type of value
-                            mySqlCol = New MySqlColumn(name, dataType)                  ' create column no type needed
+                        If dataType Is MySqlDataType.dtDecimal Then                         ' if a decimal value
+                            numPrecision = ReaderObj.GetInt32(MySqlTools.cnNumPrecision)    ' get precision
+                            numScale = ReaderObj.GetInt32(MySqlTools.cnNumScale)            ' get scale
+                            mySqlCol = New MySqlColumn(name, numPrecision, numScale)        ' create decimal column
+                        ElseIf dataType Is MySqlDataType.dtVarChar Then                     ' else if a var char value
+                            maxLen = ReaderObj.GetInt32(MySqlTools.cnCharMaxLen)            ' get max length
+                            mySqlCol = New MySqlColumn(name, dataType, maxLen)              ' create var char column
+                        Else                                                                ' else other type of value
+                            mySqlCol = New MySqlColumn(name, dataType)                      ' create column no type needed
                         End If
                         _params.Add(New MySqlParam(name, mySqlCol, Nothing, mode))
                     End While
                     If _params.Count > 0 Then
-                        Return MySqlTools.ExistsTypes.Yes                                  ' params exits
+                        Return MySqlTools.ExistsTypes.Yes                                   ' params exits
                     Else
-                        Return MySqlTools.ExistsTypes.No                                   ' did not find match, params do not exits
+                        Return MySqlTools.ExistsTypes.No                                    ' did not find match, params do not exits
                     End If
-                Else                                                                    ' else no rows
-                    Return MySqlTools.ExistsTypes.No                                       ' view does not exist
+                Else                                                                        ' else no rows
+                    Return MySqlTools.ExistsTypes.No                                        ' view does not exist
                 End If
             End If
 
@@ -514,16 +516,16 @@
         Try
             If ReaderObj Is Nothing Then                                                ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                                     ' cannot confirm view exists
+                Return MySqlTools.ExistsTypes.GotError                                  ' cannot confirm view exists
             Else                                                                        ' else got a reader object
                 If ReaderObj.HasRows Then                                               ' if got rows in return object
                     While ReaderObj.Read()                                              ' get the next piece of data
                         _text = ReaderObj.GetString(DefIndex)                           ' return string in create view/proc column
-                        Return MySqlTools.ExistsTypes.Yes                                  ' view does exits
+                        Return MySqlTools.ExistsTypes.Yes                               ' view does exits
                     End While
-                    Return MySqlTools.ExistsTypes.No                                       ' did not find match, view does not exits
+                    Return MySqlTools.ExistsTypes.No                                    ' did not find match, view does not exits
                 Else                                                                    ' else no rows
-                    Return MySqlTools.ExistsTypes.No                                       ' view does not exist
+                    Return MySqlTools.ExistsTypes.No                                    ' view does not exist
                 End If
             End If
         Catch ex As Exception
@@ -553,14 +555,14 @@
             If ReaderObj Is Nothing Then                                    ' if something went wrong
                 errorMessage = "No Reader Object"
                 _tableInfo = Nothing                                        ' no table info
-                Return MySqlTools.ExistsTypes.GotError                         ' cannot confirm table info exists
+                Return MySqlTools.ExistsTypes.GotError                      ' cannot confirm table info exists
             Else                                                            ' else got a reader object
                 If ReaderObj.HasRows Then                                   ' if got rows in return object
                     _tableInfo = ReaderObj.GetSchemaTable                   ' return the schema table
                     Return MySqlTools.ExistsTypes.Yes
                 Else                                                        ' else no rows
                     _tableInfo = Nothing                                    ' no table info
-                    Return MySqlTools.ExistsTypes.No                           ' table info does not exist
+                    Return MySqlTools.ExistsTypes.No                        ' table info does not exist
                 End If
             End If
         Catch ex As Exception
@@ -574,7 +576,9 @@
                                 ByRef errorMessage As String) As MySqlTools.ExistsTypes
 
         ' checks if user exists 
-        ' 
+        '
+        ' note: sets _text to user's HostName
+        '
         ' vars passed:
         '   ReaderObj - value returned from MySql.Data.MySqlClient.MySqlCommand.ExecuteReader
         '   errorMessage - PASSED ByRef - error message when error occurs
@@ -584,22 +588,19 @@
         '   ExistsTypes.No - user was not found        
         '   ExistsTypes.GotError - something went wrong
 
-        Const UserIndex As Integer = 0
+        Const HostIndex As Integer = 0
 
         Try
             If ReaderObj Is Nothing Then                                ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                     ' cannot confirm user exists
+                Return MySqlTools.ExistsTypes.GotError                  ' cannot confirm user exists
             Else                                                        ' else got a return value                             
                 If ReaderObj.HasRows Then                               ' if got rows in return object
                     ReaderObj.Read()                                    ' only need to read one row
-                    If ReaderObj.GetInt32(UserIndex) = 1 Then           ' if count is 1
-                        Return MySqlTools.ExistsTypes.Yes                  ' user exists
-                    Else                                                ' else count will be 0
-                        Return MySqlTools.ExistsTypes.No                   ' user does not exist
-                    End If
+                    _text = ReaderObj.GetString(HostIndex)              ' get the host name value
+                    Return MySqlTools.ExistsTypes.Yes                   ' user exists
                 Else                                                    ' else no rows
-                    Return MySqlTools.ExistsTypes.No                       ' user does not exist
+                    Return MySqlTools.ExistsTypes.No                    ' user does not exist
                 End If
             End If
         Catch ex As Exception
@@ -629,14 +630,14 @@
         Try
             If ReaderObj Is Nothing Then                                ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                     ' cannot confirm view exists
+                Return MySqlTools.ExistsTypes.GotError                  ' cannot confirm view exists
             Else                                                        ' else got a return value                             
                 If ReaderObj.HasRows Then                               ' if got rows in return object
                     ReaderObj.Read()                                    ' get the next piece of data
                     _text = ReaderObj.GetString(rawViewIndex)           ' get version string
-                    Return MySqlTools.ExistsTypes.Yes                      ' view does exits
+                    Return MySqlTools.ExistsTypes.Yes                   ' view does exits
                 Else                                                    ' else no rows
-                    Return MySqlTools.ExistsTypes.No                       ' view does not exist
+                    Return MySqlTools.ExistsTypes.No                    ' view does not exist
                 End If
             End If
         Catch ex As Exception
@@ -664,17 +665,17 @@
         Try
             If ReaderObj Is Nothing Then                                                ' if something went wrong
                 errorMessage = "No Reader Object"
-                Return MySqlTools.ExistsTypes.GotError                                     ' cannot confirm view exists
+                Return MySqlTools.ExistsTypes.GotError                                  ' cannot confirm view exists
             Else                                                                        ' else got a return value                             
                 If ReaderObj.HasRows Then                                               ' if got rows in return object
                     While ReaderObj.Read()                                              ' get the next piece of data
                         If ReaderObj.GetString(NameIndex) = NameToFind.ToLower Then     ' if the view name matches 
-                            Return MySqlTools.ExistsTypes.Yes                              ' view does exits
+                            Return MySqlTools.ExistsTypes.Yes                           ' view does exits
                         End If
                     End While
-                    Return MySqlTools.ExistsTypes.No                                       ' did not find match, view does not exits
+                    Return MySqlTools.ExistsTypes.No                                    ' did not find match, view does not exits
                 Else                                                                    ' else no rows
-                    Return MySqlTools.ExistsTypes.No                                       ' view does not exist
+                    Return MySqlTools.ExistsTypes.No                                    ' view does not exist
                 End If
             End If
         Catch ex As Exception
