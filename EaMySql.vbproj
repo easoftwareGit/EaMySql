@@ -96,6 +96,7 @@
     <Compile Include="MySqlDataType.vb" />
     <Compile Include="MySqlInfo.vb" />
     <Compile Include="MySqlParam.vb" />
+    <Compile Include="MySqlToolsFixes.vb" />
     <Compile Include="MySqlVersion.vb" />
   </ItemGroup>
   <ItemGroup>
