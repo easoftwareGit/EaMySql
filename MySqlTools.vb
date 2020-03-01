@@ -62,13 +62,21 @@ Public Class MySqlTools
     Public Const cnViewDef As String = "VIEW_DEFINITION"
     Public Const cnUnique As String = "UNIQUE"
 
+    Public Const errAlreadyInUse As Integer = -2146825243
+    Public Const errCannotOpen As Integer = -2147467259
+    Public Const errCannotModify As Integer = -2147217911
+    Public Const errNoColumn As Integer = -2147217904
+    Public Const errNoTable As Integer = -2147217865
+    Public Const errNoView As Integer = -2147467259
+
+
     'Private Const cnColHasDefault As String = "COLUMN_HASDEFAULT"
     'Private Const cnColFlags As String = "COLUMN_FLAGS"
     'Private Const cnCharOctLen As String = "CHARACTER_OCTET_LENGTH"
     'Private Const cnDateTimePrecision As String = "DATETIME_PRECISION"
     'Private Const cnNumPrecision As String = "NUMERIC_PRECISION"
 
-    Private Const backTick As String = "`"
+    Public Const backTick As String = "`"
 
     Private Const DebugFormatFind As String = "No DoEvents; {0}, TryCount: {1}, Find: {2} as a {3}"
     Private Const DebugFormatStandard As String = "No DoEvents; {0}, TryCount: {1}, Item: {2}"
@@ -84,15 +92,19 @@ Public Class MySqlTools
     Private Const emNoVersion As String = "No MySql Version"
     Private Const emNoDatabaseParam As String = "No database parameter in connection string"
 
-    Private Const errAlreadyInUse As Integer = -2146825243
-    Private Const errCannotOpen As Integer = -2147467259
-    Private Const errCannotModify As Integer = -2147217911
-    Private Const errNoColumn As Integer = -2147217904
-    Private Const errNoTable As Integer = -2147217865
-    Private Const errNoView As Integer = -2147467259
+    Public Const dfShortDate As String = "yyyy-MM-dd"
+    Public Const dfLongDate As String = dfShortDate & " H:m:s"
+    Public Const dfReallyLongDate As String = dfLongDate & ".fffffff"
+
+    'Private Const errAlreadyInUse As Integer = -2146825243
+    'Private Const errCannotOpen As Integer = -2147467259
+    'Private Const errCannotModify As Integer = -2147217911
+    'Private Const errNoColumn As Integer = -2147217904
+    'Private Const errNoTable As Integer = -2147217865
+    'Private Const errNoView As Integer = -2147467259
 
     Private Const MaxTries As Integer = 10
-    Private Const WaitMiliSeconds As Integer = 1000
+    Private Const WaitMilliSeconds As Integer = 1000
 
     Private Const ceGeneralError As Integer = 0
     Private Const ceCannotConnectToToServer As Integer = 1042
@@ -171,6 +183,18 @@ Public Class MySqlTools
         atDropColumn = 3
         atAddKey = 4
         atDropKey = 5
+    End Enum
+
+    Enum PreserveChangesTypes
+        None = -1
+        No = 0
+        Yes = 1
+    End Enum
+
+    Enum FixedConcurExTypes
+        CouldNotFix = -1
+        NeedToUpdate = 0
+        NeedToRefresh = 1
     End Enum
 
 #End Region
@@ -1199,10 +1223,10 @@ Public Class MySqlTools
                                                 ProcName As String,
                                                 Optional Params As List(Of MySqlParam) = Nothing) As MySqlDataAdapter
 
-        ' creates an OleDbDataAdapter
+        ' creates an MySqlDataAdapter
         '
         ' vars passed:
-        '   OleDbConn - connection to use
+        '   MySqlConn - connection to use
         '   ProcName - name of procedure in MySql database        
         '   Params - list of parameters for procedure - pass [Nothing] to populate params later
         ' 
@@ -1232,12 +1256,13 @@ Public Class MySqlTools
                                                 JustSelect As Boolean,
                                                 Optional SelectCommandText As String = "") As MySqlDataAdapter
 
-        ' creates an OleDbDataAdapter
+        ' creates an MySqlDataAdapter
         '
         ' vars passed:
-        '   OleDbConn - connection to use
+        '   MySqlConn - connection to use
         '   TableName - name of table in MySql database        
         '   JustSelect - only populate the MySqlDataAdapter.SelectCommand.CommandText
+        '   SelectCommandText - select command sql text
         ' 
         '  returns:
         '   MySql.Data.MySqlClient.MySqlConnection - valid MySqlConnection
@@ -1262,7 +1287,7 @@ Public Class MySqlTools
 
             If JustSelect Then                                                                              ' if only want to select data
                 MySqlDataAdapt.AcceptChangesDuringFill = False                                              ' when rows filled, RowState stays as Added         
-                Return MySqlDataAdapt                                                                       ' return the OleDbDataAdapt now
+                Return MySqlDataAdapt                                                                       ' return the MySqlDataAdapter now
             End If
 
             Dim cb As New MySqlCommandBuilder(MySqlDataAdapt)                                               ' get SQL command building 
@@ -1283,23 +1308,102 @@ Public Class MySqlTools
             MySqlDataAdapt.DeleteCommand = cb.GetDeleteCommand()                                            ' get the delete command
             If MySqlDataAdapt.DeleteCommand Is Nothing OrElse MySqlDataAdapt.DeleteCommand.CommandText = String.Empty Then
                 _errorCode = sqlCouldNotCreateDeleteCommand
-                _errorMessage = String.Format("Could not create SQL DELETE command for OleDbDataAdapter for table {0} in database {1} on server {2}.",
+                _errorMessage = String.Format("Could not create SQL DELETE command for MySqlDataAdapter for table {0} in database {1} on server {2}.",
                                               TableName, MySqlConn.Database, MySqlConn.DataSource)
                 Return Nothing                                                                              ' return nothing
             End If
             MySqlDataAdapt.InsertCommand = cb.GetInsertCommand()                                            ' get the insert command
             If MySqlDataAdapt.InsertCommand Is Nothing OrElse MySqlDataAdapt.InsertCommand.CommandText = String.Empty Then
                 _errorCode = sqlCouldNotCreateInsertCommand
-                _errorMessage = String.Format("Could not create SQL INSERT command for OleDbDataAdapter for table {0} in database {1} on server {2}.",
+                _errorMessage = String.Format("Could not create SQL INSERT command for MySqlDataAdapter for table {0} in database {1} on server {2}.",
                                               TableName, MySqlConn.Database, MySqlConn.DataSource)
                 Return Nothing                                                                              ' return nothing
             End If
             MySqlDataAdapt.UpdateCommand = cb.GetUpdateCommand()                                            ' get the update command
             If MySqlDataAdapt.UpdateCommand Is Nothing OrElse MySqlDataAdapt.UpdateCommand.CommandText = String.Empty Then
                 _errorCode = sqlCouldNotCreateUpdateCommand
-                _errorMessage = String.Format("Could not create SQL UPDATE command for OleDbDataAdapter for table {0} on connection {1}.",
+                _errorMessage = String.Format("Could not create SQL UPDATE command for MySqlDataAdapter for table {0} on connection {1}.",
                                               TableName, MySqlConn.Database, MySqlConn.DataSource)
                 Return Nothing                                                                              ' return nothing
+            End If
+
+            Return MySqlDataAdapt                   ' return the MySqlDataAdapt
+        Catch ex As Exception
+            _errorCode = sqlOtherErr
+            _errorMessage = String.Format(efOther, ex.Message)
+            Return Nothing
+        End Try
+    End Function
+
+    Public Shared Function CreateMySqlDataAdapt(MySqlConn As MySqlConnection,
+                                                TableName As String,
+                                                SelectCommandText As String,
+                                                DeleteCommandText As String,
+                                                InsertCommandText As String,
+                                                UpdateCommandText As String) As MySqlDataAdapter
+
+        ' creates an MySqlDataAdapter
+        '
+        ' vars passed:
+        '   MySqlConn - connection to use
+        '   TableName - name of table in MySql database        
+        '   SelectCommandText - select command text
+        '   DeleteCommandText - delete command text
+        '   InsertCommandText - insert command text
+        '   UpdateCommandText - update command text
+        ' 
+        '  returns:
+        '   MySql.Data.MySqlClient.MySqlConnection - valid MySqlConnection
+        '   Nothing - something went wrong
+
+        _errorMessage = String.Empty
+        Try
+            Dim MySqlDataAdapt As New MySqlDataAdapter()
+            If MySqlDataAdapt Is Nothing Then                                                               ' if did not get a MySqlDataAdapter
+                _errorCode = sqlCouldNotCreateDbAdapter
+                _errorMessage = String.Format("Could not create a MySqlDataAdapter for table {0} in database {1} on server {2}.",
+                                              TableName, MySqlConn.Database, MySqlConn.DataSource)
+                Return Nothing                                                                              ' return nothing
+            End If
+
+            If SelectCommandText <> String.Empty Then
+                MySqlDataAdapt.SelectCommand = New MySqlCommand(SelectCommandText, MySqlConn)               ' create select command
+                If MySqlDataAdapt.SelectCommand Is Nothing OrElse MySqlDataAdapt.SelectCommand.CommandText = String.Empty Then
+                    _errorCode = sqlCouldNotCreateDeleteCommand
+                    _errorMessage = String.Format("Could not create SQL SELECT command for MySqlDataAdapter for table {0} in database {1} on server {2}.",
+                                              TableName, MySqlConn.Database, MySqlConn.DataSource)
+                    Return Nothing                                                                          ' return nothing
+                End If
+            End If
+
+            If DeleteCommandText <> String.Empty Then
+                MySqlDataAdapt.DeleteCommand = New MySqlCommand(DeleteCommandText, MySqlConn)               ' get the delete command
+                If MySqlDataAdapt.DeleteCommand Is Nothing OrElse MySqlDataAdapt.DeleteCommand.CommandText = String.Empty Then
+                    _errorCode = sqlCouldNotCreateDeleteCommand
+                    _errorMessage = String.Format("Could not create SQL DELETE command for MySqlDataAdapter for table {0} in database {1} on server {2}.",
+                                                  TableName, MySqlConn.Database, MySqlConn.DataSource)
+                    Return Nothing                                                                          ' return nothing
+                End If
+            End If
+
+            If InsertCommandText <> String.Empty Then
+                MySqlDataAdapt.InsertCommand = New MySqlCommand(InsertCommandText, MySqlConn)               ' get the insert command
+                If MySqlDataAdapt.InsertCommand Is Nothing OrElse MySqlDataAdapt.InsertCommand.CommandText = String.Empty Then
+                    _errorCode = sqlCouldNotCreateInsertCommand
+                    _errorMessage = String.Format("Could not create SQL INSERT command for MySqlDataAdapter for table {0} in database {1} on server {2}.",
+                                                  TableName, MySqlConn.Database, MySqlConn.DataSource)
+                    Return Nothing                                                                          ' return nothing
+                End If
+            End If
+
+            If UpdateCommandText <> String.Empty Then
+                MySqlDataAdapt.UpdateCommand = New MySqlCommand(UpdateCommandText, MySqlConn)               ' get the update command
+                If MySqlDataAdapt.UpdateCommand Is Nothing OrElse MySqlDataAdapt.UpdateCommand.CommandText = String.Empty Then
+                    _errorCode = sqlCouldNotCreateUpdateCommand
+                    _errorMessage = String.Format("Could not create SQL UPDATE command for MySqlDataAdapter for table {0} on connection {1}.",
+                                                  TableName, MySqlConn.Database, MySqlConn.DataSource)
+                    Return Nothing                                                                          ' return nothing
+                End If
             End If
 
             Return MySqlDataAdapt                   ' return the MySqlDataAdapt
@@ -1383,7 +1487,7 @@ Public Class MySqlTools
                         'My.Application.DoEvents()                                                       ' make sure everything is done
                         'Debug.WriteLine(String.Format(DebugFormatStandard, "ExecuteNonQuery", TryCount, SqlText))
 
-                        System.Threading.Thread.Sleep(WaitMiliSeconds)                                  ' wait for a time
+                        System.Threading.Thread.Sleep(WaitMilliSeconds)                                  ' wait for a time
                     Else                                                                                ' else got an unhandled error
                         returnValue = exMySql.ErrorCode                                                 ' set return error
                         Exit Do                                                                         ' ok to exit 
@@ -1457,7 +1561,7 @@ Public Class MySqlTools
                     TryCount += 1                                                               ' increment try count
                     'My.Application.DoEvents()                                                   ' make sure everything is done
                     'Debug.WriteLine("No DoEvents")
-                    System.Threading.Thread.Sleep(WaitMiliSeconds)                              ' wait for a time
+                    System.Threading.Thread.Sleep(WaitMilliSeconds)                              ' wait for a time
                 Else                                                                            ' else got an unhandled error
                     ScalarReturn = exMySql.ErrorCode                                            ' set return error
                     Done = True                                                                 ' ok to exit 
@@ -1502,7 +1606,7 @@ Public Class MySqlTools
         '   ExistsTypes.No - it was not found
         '   ExistsTypes.OverMaxTries - tried more than MaxTries to open connection
         '   ExistsTypes.GotError 
-        '     - error getting table from OleDbConn.GetOleDbSchemaTable()        
+        '     - error getting table from MySqlConn
         '     - error closing connection
         '     - something went wrong
 
@@ -1540,7 +1644,7 @@ Public Class MySqlTools
                         End If
                         'My.Application.DoEvents()                                                               ' process all windows messages
                         'Debug.WriteLine(String.Format(DebugFormatFind, "DoesItExists", TryCount, ObjToFind.MySqlTypeToFind.ToString, ObjToFind.NameToFind))
-                        System.Threading.Thread.Sleep(WaitMilliSeconds)                                         ' sleep for a time
+                        System.Threading.Thread.Sleep(EaSql.Ea.WaitMilliSeconds)                                         ' sleep for a time
                     ElseIf exMySql.ErrorCode = ErrToHandle Then                                                 ' else if an handled error
                         If ObjToFind.MySqlTypeToFind = MySqlInfo.MySqlTypesToFindTypes.Column Then              ' if trying to find column
                             If ErrToHandle = errNoColumn Then                                                   ' if a no column error
@@ -1582,6 +1686,189 @@ Public Class MySqlTools
         End Try
         Return returnValue
     End Function
+
+#End Region
+
+#Region " Fix Concurrency Exception "
+
+    Public Shared Function FixConcurrencyException(MySqlConn As MySqlConnection,
+                                                   rowWithConcurEx As DataRow,
+                                                   rurRowInDb As DataRow,
+                                                   tempTable As DataTable) As FixedConcurExTypes
+
+        ' tries to fix Concurrency error based on value in UpdatedWhen column
+        '
+        ' vars passed:
+        '   MySqlConn - mySql connection
+        '   rowWithErr - row with error
+        '   curRowInDb - current row in database
+        '   tempTable - temp table used when fixing concurrency error
+        '
+        ' returns:
+        '   FixedConcurExTypes.NeedToUpdate - fixed, need to re-call update(table, false)
+        '   FixedConcurExTypes.NeedToRefresh - fixed, need to refresh table
+        '   FixedConcurExTypes.CouldNotFix - could not fixed
+        '     - already fixing table
+        '     - added wrong # of rows
+        '     - error inserting row
+        '     - error keeping row
+        '     - something went wrong
+
+        Try
+            If Not tempTable.DataSet Is Nothing Then                                                        ' if temp table already in a dataset
+                _errorMessage = String.Format("Table ""{0}"" is currently fixing another Concurrency error.", tempTable.TableName)
+                _errorCode = teAlreadyFixing
+                Return MySqlTools.FixedConcurExTypes.CouldNotFix
+            End If
+
+            Using tempDS As New DataSet
+                tempDS.Tables.Add(tempTable)                                                                ' add temp table to temp data set
+                Try
+                    Dim FixedType As FixedConcurExTypes
+                    If rurRowInDb Is Nothing Then                                                           ' if other user deleted row
+                        Dim rowCount As Integer
+                        If rowWithConcurEx.RowState = DataRowState.Deleted Then                             ' if RowWithConcurEx was deleted
+                            Return FixedConcurExTypes.NeedToRefresh
+                        Else                                                                                ' else other user delete row
+                            Dim origRow As DataRow = GetDataRow(rowWithConcurEx, DataRowVersion.Original)   ' get original row
+                            rowCount = AddRowViaSql(MySqlConn, rowWithConcurEx.Table.TableName, origRow)    ' add original row back to database
+                            If rowCount = 0 OrElse rowCount > 1 Then                                        ' if did not ad 1 row
+                                _errorMessage = String.Format("Wrong number ({0}) of rows inserted", rowCount)
+                                _errorCode = teWrongRowCountErr
+                                Return FixedConcurExTypes.CouldNotFix
+                            ElseIf rowCount < 0 Then                                                        ' else if got an error
+                                _errorMessage = "Error inserting row"
+                                _errorCode = rowCount
+                                Return FixedConcurExTypes.CouldNotFix
+                            End If
+                            tempTable.ImportRow(origRow)                                                    ' import orig row into temp table
+                            FixedType = KeepRow(rowWithConcurEx, rowWithConcurEx.Table, tempTable)          ' keep row with concur ex
+                            If FixedType = FixedConcurExTypes.CouldNotFix Then                              ' if error keeping row                                
+                                ' errorMessage and _error code set in KeepRow()
+                                Return FixedConcurExTypes.CouldNotFix
+                            End If
+                            Return FixedConcurExTypes.NeedToUpdate
+                        End If
+                    Else                                                                                    ' else user deleted or edited row                        
+                        Dim RowUpdatedWhen As Date = GcrcvAs(rowWithConcurEx, tsUpdatedWhenColName, NoDate) ' get when row with concur ex updated
+                        Dim CrUpdatedWhen As Date = GcrcvAs(rurRowInDb, tsUpdatedWhenColName, NoDate)       ' get when current row updated
+                        If RowUpdatedWhen <> NoDate AndAlso CrUpdatedWhen <> NoDate Then                    ' if got an update for either row
+                            If RowUpdatedWhen >= CrUpdatedWhen Then                                         ' if concur ex row has most recent data
+                                FixedType = KeepRow(rowWithConcurEx, rowWithConcurEx.Table, tempTable)      ' keep row with concur ex
+                                If FixedType = FixedConcurExTypes.CouldNotFix Then                          ' if error keeping row
+                                    ' errorMessage and _error code set in KeepRow()
+                                    Return FixedConcurExTypes.CouldNotFix
+                                End If
+                                Return FixedConcurExTypes.NeedToUpdate
+                            Else                                                                            ' else current row has most recent data
+                                FixedType = KeepRow(rurRowInDb, rowWithConcurEx.Table, tempTable)           ' keep current db row 
+                                If FixedType = FixedConcurExTypes.CouldNotFix Then                          ' if error keeping row
+                                    ' errorMessage and _error code set in KeepRow()
+                                    Return FixedConcurExTypes.CouldNotFix
+                                End If
+                                Return FixedConcurExTypes.NeedToUpdate
+                            End If
+                        Else                                                                                ' else no updated when for either row
+                            FixedType = KeepRow(rowWithConcurEx, rowWithConcurEx.Table, tempTable)          ' keep row with concur ex
+                            If FixedType = FixedConcurExTypes.CouldNotFix Then                              ' if error keeping row
+                                ' errorMessage and _error code set in KeepRow()
+                                Return FixedConcurExTypes.CouldNotFix
+                            End If
+                            Return FixedConcurExTypes.NeedToUpdate
+                        End If
+                    End If
+
+                    ' if got here the fixed error
+                    'Return 1 ' one row's concurrency error fixed
+                Catch ex As Exception
+                    _errorMessage = String.Format("Fixing concurrency error for table ""{0}"".  {1}", tempTable.TableName, ex.Message)
+                    _errorCode = teConcurrencyErr
+                    Return FixedConcurExTypes.CouldNotFix
+                End Try
+            End Using
+        Catch ex As Exception
+            _errorMessage = String.Format(efOther, ex.Message)
+            _errorCode = ex.HResult
+            Return FixedConcurExTypes.CouldNotFix
+        End Try
+    End Function
+
+    Private Shared Function KeepRow(rowToKeep As DataRow,
+                                    table As DataTable,
+                                    tempTable As DataTable) As FixedConcurExTypes
+
+        ' enables keeping of a row when the row has been changed by another user
+        ' for example
+        '   1) user x fills table z
+        '   2) user x makes changes to row 1
+        '   3) user y fills table z
+        '   4) user y makes changes to row 1
+        '   5) user y updates row 1 in table z
+        '   6) user x updates row 1 in table z (causes Concurrency Exception)
+        '   this func will enable step 6 to complete
+        '
+        ' vars passed:
+        '   rowToKeep - row values to be kept (can be current user's row or current row in database)
+        '   TempTable - table with copy of current row data in database             
+        '
+        ' returns
+        '   1 - 1 row updated
+        '   0 - update did not work
+        '   teNoPrimaryKey - no primary key for rowToKeep
+        '   teRowNotFound - matching row not found in current database table 
+        '   teOtherErr - something went wrong
+
+        Try
+            Dim KeyVals() As Object = GetRowKeyValues(rowToKeep)                            ' get key values
+            If KeyVals Is Nothing Then                                                      ' if no key values                    
+                _errorMessage = "No primary key"
+                _errorCode = teNoPrimaryKey
+                Return FixedConcurExTypes.CouldNotFix
+            End If
+
+            Dim t2Table As DataTable = rowToKeep.Table.Clone                                ' make a clone of the temp table
+            t2Table.Rows.Add(rowToKeep.ItemArray)                                           ' add row to keep to temp table 2
+            MergeTableIntoDataSet(tempTable, table.DataSet, PreserveChangesTypes.Yes)       ' merge current data
+            Dim rowToRestore As DataRow = FindRow(table, KeyVals)                           ' find row to restore
+            If rowToRestore Is Nothing Then                                                 ' if did not find row to restore
+                _errorMessage = "Could not find row to restore"
+                _errorCode = teRowNotFound
+                Return FixedConcurExTypes.CouldNotFix
+            End If
+            CopyRow(t2Table.Rows(0), rowToRestore)                                          ' restore row values (user's edits) 
+            Return FixedConcurExTypes.NeedToUpdate
+        Catch ex As Exception
+            _errorMessage = String.Format(efOther, ex.Message)
+            _errorCode = ex.HResult
+            Return FixedConcurExTypes.CouldNotFix
+        End Try
+    End Function
+
+    Public Shared Sub MergeTableIntoDataSet(tempTable As DataTable,
+                                            ds As DataSet,
+                                            preserveChanges As PreserveChangesTypes)
+
+        ' merges temp table into dataset
+        '   
+        ' vars passed:
+        '   tempTable - table to merge
+        '   ds - data set to merge into
+        '   preserveChanges - preserve changes option
+
+        Try
+            Select Case preserveChanges
+                Case PreserveChangesTypes.None
+                    ds.Merge(tempTable)
+                Case PreserveChangesTypes.No
+                    ds.Merge(tempTable, False, MissingSchemaAction.Ignore)
+                Case PreserveChangesTypes.Yes
+                    ds.Merge(tempTable, True, MissingSchemaAction.Ignore)
+            End Select
+        Catch ex As Exception
+            _errorMessage = String.Format(efOther, ex.Message)
+            _errorCode = ex.HResult
+        End Try
+    End Sub
 
 #End Region
 
@@ -2282,27 +2569,78 @@ Public Class MySqlTools
                     End If
                 End If
                 If Table.Rows.Count > 0 AndAlso DoClear Then                                                ' if got rows, and want to clear
-                    If EaTools.DataTools.SafeClear(Table) <> NoErrors Then                              ' if could not clear table
-                        Return EaTools.Ea.teCouldNotClearErr                                                ' return error
+                    If SafeClear(Table) <> NoErrors Then                                                    ' if could not clear table
+                        Return teCouldNotClearErr                                                           ' return error
                     End If
                 End If
-                Return MySqlDataAdapt.Fill(Table)                                                           ' fill table, return # of rows filled
+                Return MySqlDataAdapt.Fill(Table)                                                           ' fill table, return # of rows filled                
             Catch MySqlEx As MySqlException
                 If MySqlEx.ErrorCode = errCannotOpen AndAlso TryCount < MaxTries Then
                     TryCount += 1
                     'My.Application.DoEvents()
                     'Debug.WriteLine("No DoEvents")
-                    System.Threading.Thread.Sleep(WaitMilliSeconds)
+                    System.Threading.Thread.Sleep(EaSql.Ea.WaitMilliSeconds)
                 Else
                     _errorMessage = String.Format("MySql Error while loading data table {0}{1}Error Code:{4}{1}Database: {2}{1}{3}",
                                                   Table.TableName, vbCrLf, MySqlDataAdapt.SelectCommand.Connection.DataSource, MySqlEx.Message, MySqlEx.ErrorCode)
                     Return MySqlEx.ErrorCode
                 End If
             Catch ex As Exception
-                _errorCode = EaTools.Ea.teOtherErr
+                _errorCode = teOtherErr
                 _errorMessage = String.Format(efOther, ex.Message)
             End Try
         Loop
+    End Function
+
+#End Region
+
+#Region " GetColumnNames "
+
+    Public Shared Function GetColumnNames(MySqlConn As MySqlConnection,
+                                          ChildTable As DataTable,
+                                          TableNameInList As String) As String
+
+        ' gets columns names in the actual designed table.  some of the tables in the datasets get columns from 
+        ' queries spanning multiple tables, so some of the columns are not in the designed table.  the data set has
+        ' only tables as they are actually designed.  The actual table columns are needed when moving non-linked rows out
+        ' of a table
+        '
+        ' vars passed:
+        '   ChildTable - table with non linked rows
+        '   TableNameInList - table name to use in the column list
+        '
+        ' returns:
+        '   IncludeTableName <> "": "TableNameInList.Column1, TableNameInList.Column2, ...
+        '   IncludeTableName = "": "Column1, Column2, ..."
+        '   ""
+        '     - ChildTable does not exist in database
+        '     - something went wrong
+
+        Const ColNameIndex As Integer = 0   ' column name position in each row of clTable
+
+        Try
+            Dim infoTable As DataTable = TableInfo(MySqlConn, ChildTable.TableName)                 ' get info about child table
+            If infoTable Is Nothing Then                                                            ' if no info
+                Return String.Empty                                                                 ' return empty string
+            End If
+            Dim ColumnListStr As String = String.Empty
+
+            For Each row As DataRow In infoTable.Rows                                               ' for each row in info table
+                If ColumnListStr <> String.Empty Then                                               ' if not the first row
+                    ColumnListStr &= ", "                                                           ' add comma and space
+                End If
+                If TableNameInList <> String.Empty Then                                             ' if got a TableNameInList 
+                    ColumnListStr &= String.Format("{0}.{1}", TableNameInList, row(ColNameIndex))   ' format column list entry
+                Else                                                                                ' else no TableNameInList
+                    ColumnListStr &= row(ColNameIndex).ToString                                     ' add column name to list
+                End If
+            Next
+            Return ColumnListStr
+        Catch ex As Exception
+            _errorMessage = String.Format(efOther, ex.Message)
+            _errorCode = teOtherErr
+            Return String.Empty
+        End Try
     End Function
 
 #End Region
@@ -3144,6 +3482,109 @@ Public Class MySqlTools
 
 #End Region
 
+#Region " Column Select String "
+
+    Public Shared Function ColumnSelectString(ColumnName As String,
+                                              Value As Object,
+                                              Optional TableName As String = "",
+                                              Optional Op As String = "=",
+                                              Optional UseSingleQuotes As Boolean = True) As String
+
+        ' creates the selection string for one column
+        '
+        ' vars passed:
+        '   ColumnName - Name of column for selection string
+        '   Value - value for column
+        '   TableName - if not "", then return `TableName`.`ColumnName` ...
+        '   Op - operator to use in selection
+        '     valid values are "=", "<", ">", "<=", ">=", "<>"
+        '       "IN", "LIKE" - when aValue is a string
+        '   UseSingleQuotes - TRUE if want single quotes around Value text
+        '     
+        ' returns:
+        '   if Value is Nothing:
+        '       "`ColumnName` Is Null"
+        '   if Value is a boolean:
+        '       "`ColumnName` = TRUE" or "`ColumnName` = FALSE" 
+        '       (no single quotes for boolean value)
+        '   if Value is a date:
+        '       "`ColumnName` op #yyyy-mm-dd#" 
+        '       where op is the operator
+        '   if Value is not a boolean
+        '       "`ColumnName` op 'XXX'" or "`ColumnName` Is Null"
+        '       where op is the operator
+
+        Dim ValueText As String = String.Empty
+
+        Try
+            If Value IsNot Nothing Then
+                If TypeOf Value Is Date Then
+                    ValueText = CDate(Value).ToString(dfShortDate)
+                Else
+                    ValueText = Value.ToString
+                End If
+            End If
+        Catch ex As Exception
+            ValueText = String.Empty
+        End Try
+
+        Op = Op.ToUpper()
+        Select Case Op
+            ' normal comparison operators
+            Case "=", "<", ">", "<=", ">=", "<>"
+                ' do nothing
+
+                ' if an operator for just strings
+            Case "IN", "LIKE"
+                Try
+                    If Not (Value Is Nothing) Then              ' if got a value
+                        If Not (TypeOf Value Is String) Then    ' and value is not a string
+                            Op = "="                            ' then use default operator
+                        End If
+                    Else                                        ' else no value
+                        Op = "="                                ' then use default operator
+                    End If
+                Catch ex As Exception
+                    Op = "="
+                End Try
+
+            Case Else
+                Op = "="
+        End Select
+
+        Dim ColumnNameText As String = String.Empty
+        If TableName <> String.Empty Then                           ' if got a table name
+            ColumnNameText = String.Format("`{0}`.", TableName)     ' start with table name .
+        End If
+        ColumnNameText &= String.Format("`{0}`", ColumnName)        ' add in column name
+
+        If TypeOf Value Is Boolean Then
+            Return String.Format("{0} = {1}", ColumnNameText, ValueText)
+        Else
+            If ValueText = String.Empty Then
+                If Op = "<>" Then
+                    Return ColumnNameText & " Is Not Null"
+                Else
+                    Return ColumnNameText & " Is Null"
+                End If
+            Else
+                If TypeOf Value Is Date Then
+                    Return String.Format("{0} {1} '{2}'", ColumnNameText, Op, ValueText)
+                ElseIf TypeOf Value Is String Then
+                    If UseSingleQuotes Then
+                        Return String.Format("{0} {1} '{2}'", ColumnNameText, Op, ValueText.Replace("'", "''"))
+                    Else
+                        Return String.Format("{0} {1} {2}", ColumnNameText, Op, ValueText.Replace("'", "''"))
+                    End If
+                Else
+                    Return String.Format("{0} {1} {2}", ColumnNameText, Op, ValueText)
+                End If
+            End If
+        End If
+    End Function
+
+#End Region
+
 #Region " Drop Column "
 
     Public Shared Function DropColumn(MySqlConn As MySqlConnection,
@@ -3236,40 +3677,6 @@ Public Class MySqlTools
 
 #Region " Row Actions "
 
-#Region " Update via SQL "
-
-    Public Shared Function UpdateViaSql(MySqlConn As MySqlConnection,
-                                        UpdateSqlText As String) As Integer
-
-        ' Updates a table via a SQL command.  Makes sure sql command starts with "UPDATE", and then calls
-        '   ExecuteNonQuery to do the query.  
-        '
-        ' vars passed:
-        '   MySqlConn - mysql connection to use
-        '   UpdateSqlText - SqlText to use
-        '
-        ' returns:
-        '   >= 0 - no errors
-        '   sqlInvalidCommand - invalid sql command
-        '   <0 - SqlCommand.ExecuteNonQuery error value
-        '   sqlErr- other error in sql 
-
-        _errorMessage = String.Empty                                        ' clear error message
-        Try
-            If Not UpdateSqlText.ToUpper.StartsWith("UPDATE".ToUpper) Then
-                _errorMessage = String.Format("The Update SQL command does not start with ""UPDATE"".  SQL Command Text:{0}{1}", vbCrLf, UpdateSqlText)
-                Return sqlInvalidCommand
-            End If
-
-            Return ExecuteNonQuery(MySqlConn, UpdateSqlText)                ' do the update via SQL, and return the value
-        Catch ex As Exception
-            _errorMessage = String.Format(efOther, ex.Message)
-            Return sqlErr
-        End Try
-    End Function
-
-#End Region
-
 #Region " Add/Insert Row via SQL "
 
     Public Shared Function AddRowViaSql(MySqlConn As MySqlConnection,
@@ -3353,23 +3760,23 @@ Public Class MySqlTools
         '   ColumnName - name of a column to include in the INSERT SQL statement
 
         Try
-            _errorMessage = String.Empty                                    ' clear error message
-            If row.IsNull(ColumnName) Then                                  ' if no value in column
-                Return                                                      ' exit now, do nothing
+            _errorMessage = String.Empty                                                                ' clear error message
+            If row.IsNull(ColumnName) Then                                                              ' if no value in column
+                Return                                                                                  ' exit now, do nothing
             End If
 
-            If Not InsertStr.EndsWith("(") Then                             ' if not the first entry
-                InsertStr &= ", "                                           ' add a comma separator
+            If Not InsertStr.EndsWith("(") Then                                                         ' if not the first entry
+                InsertStr &= ", "                                                                       ' add a comma separator
                 ValueStr &= ", "
             End If
-            InsertStr &= ColumnName                                         ' add in value column name
-            If TypeOf row(ColumnName) Is Date Then                          ' if a date value
-                ValueStr &= String.Format("#{0}#", CStr(row(ColumnName)))   ' add in value, enclosed with #
-            ElseIf TypeOf row(ColumnName) Is String Then                    ' else if a string
+            InsertStr &= ColumnName                                                                     ' add in value column name
+            If TypeOf row(ColumnName) Is Date Then                                                      ' if a date value
+                ValueStr &= String.Format("'{0}'", CDate(row(ColumnName)).ToString(dfReallyLongDate))   ' add in value, enclosed with #
+            ElseIf TypeOf row(ColumnName) Is String Then                                                ' else if a string
                 ' add in value, enclosed with '.  also, if text has a ', then convert to ''
                 ValueStr &= String.Format("'{0}'", row(ColumnName).ToString.Replace("'", "''"))
-            Else                                                            ' else a regular value
-                ValueStr &= row(ColumnName).ToString                        ' add in value 
+            Else                                                                                        ' else a regular value
+                ValueStr &= row(ColumnName).ToString                                                    ' add in value 
             End If
         Catch ex As Exception
             _errorMessage = String.Format(efOther, ex.Message)
@@ -3524,6 +3931,74 @@ Public Class MySqlTools
         Catch ex As Exception
             _errorMessage = String.Format(efOther, ex.Message)
             Return sqlOtherErr
+        End Try
+    End Function
+
+#End Region
+
+#Region " Get WhereSQL for Row "
+
+    Public Shared Function GetWhereSqlForRow(row As DataRow) As String
+
+        ' gets the where sql clause to select the row from the database
+
+        Try
+            If row.Table.PrimaryKey.Length = 0 Then                                                     ' if no primary key
+                _errorMessage = "No primary key"                                                        ' set error message
+                _errorCode = teNoPrimaryKey                                                             ' set error code
+                Return String.Empty                                                                     ' return string.empty
+            End If
+
+            ' WHERE (`ColumnName` = KeyValue) 
+            ' WHERE (`ColumnName1` = KeyValue1) AND (`ColumnName2` = KeyValue2) 
+
+            Dim WhereSql As String = "WHERE ("                                                          ' get initial where text
+            For i As Integer = 0 To row.Table.PrimaryKey.Length - 1                                     ' for each key value
+                If i > 0 Then                                                                           ' if not the first value
+                    WhereSql &= ") AND ("                                                               ' add brackets and AND 
+                End If
+                WhereSql &= ColumnSelectString(row.Table.PrimaryKey(i).ColumnName, row.ItemArray(i))    ' get selecting string for column
+            Next
+            WhereSql &= ")"                                                                             ' add ending bracket
+            Return WhereSql
+        Catch ex As Exception
+            _errorMessage = String.Format(efOther, ex.Message)
+            _errorCode = teOtherErr
+            Return String.Empty
+        End Try
+    End Function
+
+#End Region
+
+#Region " Update via SQL "
+
+    Public Shared Function UpdateViaSql(MySqlConn As MySqlConnection,
+                                        UpdateSqlText As String) As Integer
+
+        ' Updates a table via a SQL command.  Makes sure sql command starts with "UPDATE", and then calls
+        '   ExecuteNonQuery to do the query.  
+        '
+        ' vars passed:
+        '   MySqlConn - mysql connection to use
+        '   UpdateSqlText - SqlText to use
+        '
+        ' returns:
+        '   >= 0 - no errors
+        '   sqlInvalidCommand - invalid sql command
+        '   <0 - SqlCommand.ExecuteNonQuery error value
+        '   sqlErr- other error in sql 
+
+        _errorMessage = String.Empty                                        ' clear error message
+        Try
+            If Not UpdateSqlText.ToUpper.StartsWith("UPDATE".ToUpper) Then
+                _errorMessage = String.Format("The Update SQL command does not start with ""UPDATE"".  SQL Command Text:{0}{1}", vbCrLf, UpdateSqlText)
+                Return sqlInvalidCommand
+            End If
+
+            Return ExecuteNonQuery(MySqlConn, UpdateSqlText)                ' do the update via SQL, and return the value
+        Catch ex As Exception
+            _errorMessage = String.Format(efOther, ex.Message)
+            Return sqlErr
         End Try
     End Function
 
